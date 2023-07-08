@@ -1,0 +1,296 @@
+---
+title: "RMarkdown Örnek"
+author:
+  name: Prof. Dr. Hüseyin Taştan
+  affiliation: Yıldız Teknik Üniversitesi
+date: "2023 Temmuz"
+output:
+  html_document:
+    number_sections: yes
+    theme: lumen
+    highlight: haddock
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+    keep_md: yes
+  pdf_document:
+    latex_engine: xelatex
+    toc: yes
+    toc_depth: '3'
+  word_document:
+    toc: yes
+    toc_depth: '3'
+subtitle: ''
+---
+<style type="text/css"> 
+body{
+  background-color: #FAFAFA;
+  font-size: 18px;
+  line-height: 1.8;
+}
+code.r{
+  font-size: 12pt;
+}
+</style>
+<br>
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE, results = 'asis', fig.show = 'asis')
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setlocale("LC_ALL","turkish")
+``` 
+
+# Türkiye'de Yaşam Memnuniyeti Göstergeleri (2015)
+
+Bu RMarkdown dosyasında Türkiye İstatistik Kurumu'ndan (TÜİK) alınan 2015 yılına ait il bazında yaşam memnuniyeti göstergelerinin basit bir analizi sunulmuştur. 
+
+# Veriler
+
+## Verilerin Okutulması ve Hazırlanması
+
+Önce `data/mutluluk2015.xls` adresindeki verileri okutalım: 
+```{r}
+library(tidyverse)
+library(readxl) 
+veriler <- read_excel("data/mutluluk2015.xls", range = "A6:BA88")
+```
+
+`View(veriler)` ile verileri incelediğimizde bazı gözlemlerin boş olduğunu (NA) ve değişken isimlerinin çok uzun olduğunu görüyoruz. Bunun dışında veriler düzenli (tidy) formattadır.
+
+![](img/yasam1.PNG)
+
+Boş sütunları silelim:
+
+```{r}
+# ismi "..." ile başlayan boş sütunları sil
+veriler <- veriler %>% 
+  dplyr::select(-contains('...'))
+# note: select() may not work right if MASS is package is also loaded
+```
+
+Ayrıca ilk satırı sil:
+
+```{r}
+veriler <- veriler |> drop_na()
+```
+
+Şimdi elimizde 81 il için 42 değişkenden oluşan bir veri seti var. Ancak değişken isimleri çok uzun. Bunları değiştirelim.
+
+```{r}
+# TR isimlendirme
+# mevcut veri setindeki değişken isimlerini içeren karakter vektörü
+isim_tanim <- names(veriler)
+```
+
+Bu karakter vektörünü bir kenarda tutalım. Sütunlardaki değişkenlerin tanımları daha sonra gerekebilir. İhtiyaç duyduğumuzda değişkenin tam tanımına bakabiliriz. Örneğin 42nci sütundaki değişkenin tanımına ulaşmak istersek:
+
+```{r}
+isim_tanim[42]
+```
+
+Şimdi değişkenlere daha kısa isimler verelim:
+
+```{r}
+# bu karakter vektörünün elemanlarını değiştir: 
+isimler <- isim_tanim
+isimler[1] <- "il"
+isimler[2] <- "oda"
+isimler[3] <- "tuv"
+isimler[4] <- "ev_kalite"
+isimler[5] <- "istihdam"
+isimler[6] <- "issizlik"
+isimler[7] <- "ort_gun_kazanc"
+isimler[8] <- "is_tatmin"
+isimler[9] <- "tasarruf"
+isimler[10] <- "orta_ust_gelir_gr"
+isimler[11] <- "temel_iht_gr"
+isimler[12] <- "bebek_mort"
+isimler[13] <- "yasam_bek"
+isimler[14] <- "doktor_basv"
+isimler[15] <- "saglik_tatmin"
+isimler[16] <- "kamu_saglik_tatmin"
+isimler[17] <- "okullasma_3_5"
+isimler[18] <- "TEOG"
+isimler[19] <- "YGS"
+isimler[20] <- "yuk_egit_orani"
+isimler[21] <- "kamu_egit_tatmin"
+isimler[22] <- "hava_kir"
+isimler[23] <- "orman_alan"
+isimler[24] <- "atik_hiz"
+isimler[25] <- "gurultu_kir"
+isimler[26] <- "bel_temiz_tatmin"
+isimler[27] <- "cinayet"
+isimler[28] <- "tra_kaza"
+isimler[29] <- "gece_guv_yuru"
+isimler[30] <- "kamu_guv_tatmin"
+isimler[31] <- "oy_verme_belediye"
+isimler[32] <- "uyelik_siy_parti"
+isimler[33] <- "sendika"
+isimler[34] <- "internet"
+isimler[35] <- "kanalizasyon"
+isimler[36] <- "havaalani"
+isimler[37] <- "kamu_ulasim_tatmin"
+isimler[38] <- "sin_tiyatro"
+isimler[39] <- "avm"
+isimler[40] <- "sosyal_ilis_tatmin"
+isimler[41] <- "sosyal_hayat_tatmin"
+isimler[42] <- "mutluluk"
+```
+
+Sütun isimlerini değiştirelim:
+
+```{r}
+colnames(veriler) <- isimler
+# verilere göz at 
+glimpse(veriler)
+```
+
+## Verilerin saklanması 
+
+
+Verileri daha sonra kullanmak için `RData` formatında kaydedelim:
+
+```{r}
+save(veriler, file = "R/yasamveri2015.RData")
+```
+
+(Not: Yerel klasör adresini uygun şekilde değiştirebilirsiniz. Yukarıdaki kodda veri seti current dir içindeki R klasörüne kaydedildi).
+
+
+## Özet İstatistikler 
+
+Mutluluk göstergesinin özet istatistikleri ve histogramı:
+
+```{r}
+summary(veriler$mutluluk)
+```
+
+```{r}
+veriler %>% ggplot(mapping = aes(x = mutluluk)) +
+  geom_histogram(bins = 6, color = "darkblue", fill = "lightblue")
+```
+
+```{r}
+# dplyr::summarise ile özet istatistikler 
+veriler |> summarise(ortalama = mean(mutluluk),
+                     medyan = median(mutluluk), 
+                     sd = sd(mutluluk),
+                     min = min(mutluluk), 
+                     max = max(mutluluk)
+                     )
+```
+
+Türkiye'de il düzeyindeki verilerde ortalama ve medyan mutluluk düzeyleri sırasıyla, 61.15 ve 60.39 olarak bulunmuştur. Mutluluk dağılımı yaklaşık olarak simetriktir. 
+
+Verilerin özet istatistiklerinin hesaplanması için geliştirilmiş çok sayıda R paketi bulunmaktadır. Bunlardan biri `{skimr}` paketidir. Bu paketin detayları için bkz. 
+[https://github.com/ropensci/skimr](https://github.com/ropensci/skimr)
+
+`skimr::skim()` fonksiyonunu verilerimize uygulayalım: 
+```{r}
+library(skimr)
+skim(veriler)
+```
+
+Yukarıdaki tabloda verideki tüm değişkenlerin kayıp gözlem sayıları, özet istatistikleri, ve dağılımına ilişkin bilgiler yer almaktadır. 
+
+## En mutlu iller 
+
+Türkiye'de 2015 yılında en mutlu 10 il: 
+```{r}
+# list top 10 happiest provinces
+veriler |> 
+  dplyr::select(il, mutluluk) |> 
+  arrange(desc(mutluluk)) |> 
+  head(10) 
+```
+
+
+Türkiye'de 2015 yılında en mutsuz 10 il: 
+```{r}
+#  
+veriler |> 
+  dplyr::select(il, mutluluk) |> 
+  arrange(mutluluk) |> 
+  head(10) 
+```
+
+## Verilerin Görselleştirilmesi
+
+Tüm iller için mutluluk sıralamasının bir grafiğini oluşturalım:
+
+```{r, out.width="120%"}
+ggplot(veriler, aes(x = mutluluk, y = fct_reorder(il, mutluluk))) +
+  geom_point() +
+  theme(axis.text.y = element_text(size = 5)) + 
+  labs(title = "Mutluluk sıralaması (2015)", 
+       subtitle = "Kaynak: TÜİK") +
+  xlab("Mutluluk düzeyi") +
+  ylab("")
+```
+
+
+Veri setinde yer alan değişkenler arasındaki korelasyon matrisi: 
+```{r out.width="120%", message=FALSE, warning=FALSE}
+library(corrplot)
+corrplot(cor(veriler[-1]), is.corr=TRUE, order = "FPC", tl.cex=0.6)
+```
+
+**Alıştırma:** Korelasyon katsayılarını yorumlayınız. 
+
+
+## Serpilme çizimleri 
+
+İşsizlik oranı ile mutluluk düzeyi arasındaki serpilme çizimi: 
+```{r}
+# İşsizlik oranı vs. Mutluluk
+ggplot(veriler, aes(x = issizlik, y = mutluluk)) +
+      geom_point() 
+```
+
+İl etiketlerini ekleyelim: 
+```{r}
+# İşsizlik oranı vs. Mutluluk
+veriler |> 
+  ggplot(aes(x = issizlik, y = mutluluk, label = il)) +
+  geom_point(color = "blue", size = 2) +
+  geom_text(hjust = 0, vjust = -0.5, color="gray") +
+  theme_minimal()
+
+```
+
+
+**Alıştırma**: `ggrepel` paketi ile il etiketlerinin nasıl düzenlenebileceğini araştırınız. 
+
+```{r}
+# Ortalama günlük kazanç (TL) vs. Mutluluk
+ggplot(veriler, aes(x=ort_gun_kazanc, y=mutluluk)) +
+      geom_point()
+```
+
+```{r}
+# Orta ve üstü gelir grubundaki hanelerin oranı (%) vs Mutluluk
+ggplot(veriler, aes(x=orta_ust_gelir_gr, y=mutluluk)) +
+      geom_point()
+```
+
+
+**Alıştırma**: Yukarıdaki grafikleri yorumlayınız. 
+
+
+# Mutluluk düzeyi için bir regresyon modeli 
+
+```{r}
+# Mutluluk için basit bir doğrusal regresyon modeli 
+reg_mutluluk <- lm(mutluluk ~ issizlik + ort_gun_kazanc + yuk_egit_orani + hava_kir + cinayet + sin_tiyatro, data = veriler)
+summary(reg_mutluluk)
+```
+
+**Alıştırma**: Regresyon sonuçlarını yorumlayınız ve kalıntıları inceleyiniz.
+
+
+**Alıştırma**: Adjusted R-squared ölçütünü kullanarak yukarıdaki modelden daha başarılı bir regresyon modeli kurunuz.  
+
+
+
+<br>
+<div class="tocify-extend-page" data-unique="tocify-extend-page" style="height: 0;"></div>
